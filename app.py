@@ -79,6 +79,19 @@ else:
     print(f"🔒 CORS: 生产模式 - 允许来源: {allowed_origins}")
     CORS(app, origins=allowed_origins, supports_credentials=True)
 
+
+# --- Add this below your CORS(app, ...) ---
+@app.after_request
+def apply_cors_headers(response):
+    origin = request.headers.get('Origin')
+    if origin and ('vercel.app' in origin or 'localhost' in origin):
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS']
+        response.headers['Vary'] = 'Origin'
+    return response
+
 # 添加预检请求处理以确保CORS正常工作
 @app.route('/api/auth/register', methods=['OPTIONS'])
 @app.route('/api/auth/login', methods=['OPTIONS'])
