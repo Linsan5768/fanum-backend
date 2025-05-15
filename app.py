@@ -60,7 +60,7 @@ DIST_DIR = os.path.join(BASE_DIR, "web_frontend/dist")
 if not os.path.exists(DIST_DIR):  # 兼容 PyInstaller 打包后路径
     DIST_DIR = os.path.join(BASE_DIR, "../web_frontend/dist")
 
-app = Flask(__name__, static_folder=DIST_DIR, static_url_path="/")å
+app = Flask(__name__, static_folder=DIST_DIR, static_url_path="/")
 app.secret_key = os.getenv('SECRET_KEY', os.urandom(24).hex())  # 设置会话密钥
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # 会话超时时间：30分钟
 
