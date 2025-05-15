@@ -78,7 +78,7 @@ else:
     # In production, restrict origins for security
     allowed_origins = os.getenv('ALLOWED_ORIGINS', '*').split(',')
     print(f"🔒 CORS: 生产模式 - 允许来源: {allowed_origins}")
-    CORS(app, resources={r"/*": {"origins": allowed_origins}}, supports_credentials=True)
+    CORS(app, origins=allowed_origins, supports_credentials=True)
 
 # 添加预检请求处理以确保CORS正常工作
 @app.route('/api/auth/register', methods=['OPTIONS'])
