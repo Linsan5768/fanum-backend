@@ -60,7 +60,7 @@ DIST_DIR = os.path.join(BASE_DIR, "web_frontend/dist")
 if not os.path.exists(DIST_DIR):  # 兼容 PyInstaller 打包后路径
     DIST_DIR = os.path.join(BASE_DIR, "../web_frontend/dist")
 
-app = Flask(__name__, static_folder=DIST_DIR, static_url_path="/")
+app = Flask(__name__, static_folder=DIST_DIR, static_url_path="/")å
 app.secret_key = os.getenv('SECRET_KEY', os.urandom(24).hex())  # 设置会话密钥
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # 会话超时时间：30分钟
 
@@ -71,9 +71,8 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # 防止CSRF
 
 # Configure CORS based on environment
 if DEBUG:
-    # In development, allow all origins for easier testing
-    print("🔒 CORS: 开发模式 - 允许所有源")
-    CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+    print("🔒 CORS: 开发模式 - 允许本地前端源（例如 http://localhost:5173）")
+    CORS(app, origins=["http://localhost:5173", "https://fanum-frontend.vercel.app"], supports_credentials=True)
 else:
     # In production, restrict origins for security
     allowed_origins = os.getenv('ALLOWED_ORIGINS', '*').split(',')
