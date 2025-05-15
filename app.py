@@ -19,27 +19,27 @@ if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 't')
 PORT = int(os.getenv('PORT', 5002))
 
-# 计算当前脚本所在目录
+# Calculate current script directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 💡 兼容 PyInstaller 打包后的环境
-if getattr(sys, 'frozen', False):  # PyInstaller 运行时
-    BASE_DIR = sys._MEIPASS  # 获取 PyInstaller 临时目录
+# 💡 Compatible with PyInstaller packaged environment
+if getattr(sys, 'frozen', False):  # PyInstaller runtime
+    BASE_DIR = sys._MEIPASS  # Get PyInstaller temporary directory
 
-# 💡 确保 `models.py` 可被导入
-sys.path.append(BASE_DIR)  # 当前目录
-sys.path.append(os.path.join(BASE_DIR, "backend"))  # 适配 backend 目录
-sys.path.append(os.path.dirname(BASE_DIR))  # 适配 PyInstaller 运行环境
+# 💡 Ensure `models.py` can be imported
+sys.path.append(BASE_DIR)  # Current directory
+sys.path.append(os.path.join(BASE_DIR, "backend"))  # Adapt for backend directory
+sys.path.append(os.path.dirname(BASE_DIR))  # Adapt for PyInstaller runtime environment
 
-# 💡 确保 `models.py` 存在并可导入
+# 💡 Ensure `models.py` exists and can be imported
 try:
     import models
 except ModuleNotFoundError as e:
-    print("❌ 错误: models 模块未找到！")
-    print(f"🔍 当前 sys.path: {sys.path}")
-    raise e  # 抛出异常，确保我们看到完整错误信息
+    print("❌ Error: models module not found!")
+    print(f"🔍 Current sys.path: {sys.path}")
+    raise e  # Raise exception to see complete error message
 
-# 绑定数据库模型
+# Bind database models
 Session = models.Session
 Record = models.Record
 Category = models.Category
@@ -49,34 +49,34 @@ AuditLog = models.AuditLog
 insert_default_categories = models.insert_default_categories
 record_user_activity = models.record_user_activity
 
-# 确保数据库 `accounting.db` 存在
+# Ensure database `accounting.db` exists
 DB_PATH = os.path.join(BASE_DIR, "accounting.db")
 if not os.path.exists(DB_PATH):
-    print(f"⚠️ 警告: 未找到数据库文件 {DB_PATH}，将尝试创建...")
-    models.init_db()  # 重新初始化数据库
+    print(f"⚠️ Warning: Database file {DB_PATH} not found, will attempt to create...")
+    models.init_db()  # Reinitialize database
 
-# 计算 Vue 前端路径
+# Calculate Vue frontend path
 DIST_DIR = os.path.join(BASE_DIR, "web_frontend/dist")
-if not os.path.exists(DIST_DIR):  # 兼容 PyInstaller 打包后路径
+if not os.path.exists(DIST_DIR):  # Compatible with PyInstaller packaged path
     DIST_DIR = os.path.join(BASE_DIR, "../web_frontend/dist")
 
 app = Flask(__name__, static_folder=DIST_DIR, static_url_path="/")
-app.secret_key = os.getenv('SECRET_KEY', os.urandom(24).hex())  # 设置会话密钥
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # 会话超时时间：30分钟
+app.secret_key = os.getenv('SECRET_KEY', os.urandom(24).hex())  # Set session key
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # Session timeout: 30 minutes
 
-# 配置会话安全
-app.config['SESSION_COOKIE_SECURE'] = not DEBUG  # 生产环境使用HTTPS
-app.config['SESSION_COOKIE_HTTPONLY'] = True  # 防止JS访问cookie
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # 防止CSRF
+# Configure session security
+app.config['SESSION_COOKIE_SECURE'] = not DEBUG  # Use HTTPS in production environment
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JS access to cookies
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Prevent CSRF
 
 # Configure CORS based on environment
 if DEBUG:
-    print("🔒 CORS: 开发模式 - 允许本地前端源（例如 http://localhost:5173）")
+    print("🔒 CORS: Development mode - Allow local frontend source (e.g., http://localhost:5173)")
     CORS(app, origins=["http://localhost:5173", "https://fanum-frontend.vercel.app"], supports_credentials=True)
 else:
     # In production, restrict origins for security
     allowed_origins = os.getenv('ALLOWED_ORIGINS', '*').split(',')
-    print(f"🔒 CORS: 生产模式 - 允许来源: {allowed_origins}")
+    print(f"🔒 CORS: Production mode - Allow sources: {allowed_origins}")
     CORS(app, origins=allowed_origins, supports_credentials=True)
 
 
@@ -92,74 +92,74 @@ def apply_cors_headers(response):
         response.headers['Vary'] = 'Origin'
     return response
 
-# 添加预检请求处理以确保CORS正常工作
+# Add preflight request handling to ensure CORS works
 @app.route('/api/auth/register', methods=['OPTIONS'])
 @app.route('/api/auth/login', methods=['OPTIONS'])
 @app.route('/api/auth/verify', methods=['OPTIONS'])
-@app.route('/api/auth/verify-email/<token>', methods=['OPTIONS'])  # 新增预检请求处理
+@app.route('/api/auth/verify-email/<token>', methods=['OPTIONS'])  # Added preflight request handling
 def handle_auth_preflight():
-    """处理认证相关的预检请求"""
-    print("⭐ 收到认证相关的预检请求")
+    """Handle preflight requests for authentication-related requests"""
+    print("⭐ Received preflight request for authentication-related requests")
     response = jsonify({'status': 'ok'})
     response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
     return response
 
-# 发送邮件函数
+# Send email function
 def send_verification_email(email, token):
-    """发送验证邮件"""
-    # 从环境变量获取邮件配置
+    """Send verification email"""
+    # Get email configuration from environment variables
     smtp_server = os.getenv('SMTP_SERVER', 'smtp.example.com')
     smtp_port = int(os.getenv('SMTP_PORT', 587))
     smtp_user = os.getenv('SMTP_USER', 'user@example.com')
     smtp_password = os.getenv('SMTP_PASSWORD', 'password')
     sender_email = os.getenv('SENDER_EMAIL', 'noreply@example.com')
     
-    # 构建验证URL
+    # Build verification URL
     base_url = os.getenv('BASE_URL', 'http://localhost:5002')
     verify_url = f"{base_url}/api/auth/verify-email/{token}"
     
-    # 创建邮件内容
+    # Build email content
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = email
-    msg['Subject'] = "验证您的账户 - 记账工具"
+    msg['Subject'] = "Verify Your Account - Accounting Tool"
     
-    # 邮件正文
+    # Email body
     body = f"""
     <html>
     <body>
-        <h2>感谢您注册记账工具！</h2>
-        <p>请点击下面的链接验证您的邮箱地址：</p>
+        <h2>Thank you for registering with the Accounting Tool!</h2>
+        <p>Please click the link below to verify your email address:</p>
         <p><a href="{verify_url}">{verify_url}</a></p>
-        <p>如果您没有注册该账户，请忽略此邮件。</p>
+        <p>If you did not register for this account, please ignore this email.</p>
     </body>
     </html>
     """
     msg.attach(MIMEText(body, 'html'))
     
     try:
-        # 连接SMTP服务器并发送邮件
+        # Connect to SMTP server and send email
         server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()  # 启用TLS加密
+        server.starttls()  # Enable TLS encryption
         server.login(smtp_user, smtp_password)
         server.send_message(msg)
         server.quit()
-        print(f"✅ 验证邮件已发送至 {email}")
+        print(f"✅ Verification email sent to {email}")
         return True
     except Exception as e:
-        print(f"❌ 发送验证邮件失败: {e}")
+        print(f"❌ Failed to send verification email: {e}")
         import traceback
         traceback.print_exc()
         return False
 
-# 权限检查装饰器
+# Permission check decorator
 def requires_permission(permission):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            # 优先检查Authorization头
+            # Prioritize Authorization header
             auth_header = request.headers.get('Authorization')
             user = None
             user_id = None
@@ -168,162 +168,162 @@ def requires_permission(permission):
             s = Session()
             try:
                 if auth_header and auth_header.startswith('Bearer '):
-                    token = auth_header[7:]  # 去掉'Bearer '前缀
-                    # 使用token查找用户
+                    token = auth_header[7:]  # Remove 'Bearer ' prefix
+                    # Use token to find user
                     user = s.query(User).filter_by(username=token).first()
                 
-                # 如果没有认证头或认证头无效，尝试从session中获取用户ID
+                # If no authorization header or invalid header, try to get user ID from session
                 if not user and 'user_id' in session:
                     user_id = session.get('user_id')
-                    # 重要：在会话过程中获取用户与角色
+                    # Important: Get user and role in session process
                     user = s.query(User).options(
-                        # 预加载role关系
+                        # Preload role relationship
                         sqlalchemy.orm.joinedload(User.role)
                     ).filter_by(id=user_id).first()
                 
-                # 如果没有找到有效用户，返回未授权
+                # If no valid user found, return unauthorized
                 if not user or not user.is_active:
-                    return jsonify({'success': False, 'message': '未授权访问'}), 401
+                    return jsonify({'success': False, 'message': 'Unauthorized access'}), 401
                 
-                # 检查角色和权限
+                # Check role and permissions
                 if user.role:
                     user_role = user.role.name
                 
-                # 检查权限
+                # Check permissions
                 if permission == 'admin' and user_role != 'admin':
-                    return jsonify({'success': False, 'message': '需要管理员权限'}), 403
+                    return jsonify({'success': False, 'message': 'Admin permission required'}), 403
                 elif not user.has_permission(permission):
-                    return jsonify({'success': False, 'message': '无权执行此操作'}), 403
+                    return jsonify({'success': False, 'message': 'No permission to perform this operation'}), 403
                     
-                # 更新会话活动时间
+                # Update session activity time
                 if 'user_id' in session:
                     session.modified = True
                     
-                # 调用原始视图函数，使用同一个会话
+                # Call original view function, using the same session
                 return f(user, *args, **kwargs)
             finally:
                 s.close()
         return decorated_function
     return decorator
 
-# 检查会话超时的中间件
+# Check session timeout middleware
 @app.before_request
 def check_session_timeout():
-    # 跳过OPTIONS请求和静态文件
+    # Skip OPTIONS requests and static files
     if request.method == 'OPTIONS' or request.path.startswith('/static/'):
         return
         
-    # 如果用户已登录，检查会话活动时间
+    # If user is logged in, check session activity time
     if 'user_id' in session and 'last_activity' in session:
         last_activity = session.get('last_activity')
         if isinstance(last_activity, str):
-            # 如果last_activity是字符串，则转换为datetime
+            # If last_activity is a string, convert to datetime
             try:
                 last_activity = datetime.fromisoformat(last_activity)
             except ValueError:
-                # 如果转换失败，则重置会话
+                # If conversion fails, reset session
                 session.clear()
                 return
         
-        # 确保没有时区信息
+        # Ensure no timezone information
         if hasattr(last_activity, 'tzinfo') and last_activity.tzinfo is not None:
-            # 去除时区信息
+            # Remove timezone information
             last_activity = last_activity.replace(tzinfo=None)
             
-        now = datetime.utcnow()  # 无时区信息的UTC时间
+        now = datetime.utcnow()  # UTC time without timezone information
         
-        # 如果最后活动时间超过会话超时时间，则清除会话
+        # If last activity time exceeds session timeout time, clear session
         timeout = timedelta(minutes=30)
         if now - last_activity > timeout:
             session.clear()
             if request.content_type == 'application/json':
-                return jsonify({'success': False, 'message': '会话已过期，请重新登录', 'session_expired': True}), 401
+                return jsonify({'success': False, 'message': 'Session expired, please log in again', 'session_expired': True}), 401
                 
-    # 更新最后活动时间
+    # Update last activity time
     if 'user_id' in session:
-        session['last_activity'] = datetime.utcnow().isoformat()  # 存储为ISO格式字符串
+        session['last_activity'] = datetime.utcnow().isoformat()  # Store as ISO format string
 
-# ===== 用户认证 API =====
+# ===== User authentication API =====
 @app.route('/api/auth/register', methods=['POST'])
 def register():
-    """注册新用户"""
-    print("⭐ 收到注册请求")
+    """Register new user"""
+    print("⭐ Received registration request")
     try:
         data = request.json
         if not data:
-            print("❌ 请求数据为空或格式不正确")
-            return jsonify({'success': False, 'message': '请求数据为空或格式不正确'}), 400
+            print("❌ Request data is empty or incorrect")
+            return jsonify({'success': False, 'message': 'Request data is empty or incorrect'}), 400
             
-        # 从请求中获取数据
+        # Get data from request
         username = data.get('username')
         email = data.get('email')
         password = data.get('password')
         given_name = data.get('givenName')
         family_name = data.get('familyName')
         phone = data.get('phone')
-        role_name = data.get('role', 'individual')  # 默认为个人用户
+        role_name = data.get('role', 'individual')  # Default to individual user
         
         # If no username is provided, use email as username
         if not username and email:
             username = email
             
-        print(f"📝 注册请求数据: email={email}, role={role_name}, password={'*' * len(password) if password else 'None'}")
+        print(f"📝 Registration request data: email={email}, role={role_name}, password={'*' * len(password) if password else 'None'}")
         
-        # 验证必填字段
+        # Validate required fields
         if not password or not email:
-            print("❌ 邮箱和密码不能为空")
-            return jsonify({'success': False, 'message': '邮箱和密码不能为空'}), 400
+            print("❌ Email and password cannot be empty")
+            return jsonify({'success': False, 'message': 'Email and password cannot be empty'}), 400
         
-        # 简单验证邮箱格式
+        # Simple email format validation
         if '@' not in email or '.' not in email:
-            print(f"❌ 邮箱格式不正确: {email}")
-            return jsonify({'success': False, 'message': '邮箱格式不正确'}), 400
+            print(f"❌ Incorrect email format: {email}")
+            return jsonify({'success': False, 'message': 'Incorrect email format'}), 400
             
-        # 验证角色是否有效
+        # Validate role is valid
         if role_name not in ['individual', 'business']:
-            print(f"❌ 无效的角色类型: {role_name}")
-            return jsonify({'success': False, 'message': '无效的角色类型'}), 400
+            print(f"❌ Invalid role type: {role_name}")
+            return jsonify({'success': False, 'message': 'Invalid role type'}), 400
             
         s = Session()
         try:
-            # 检查用户名是否已存在
+            # Check if username already exists
             existing_user = s.query(User).filter_by(username=username).first()
             if existing_user:
-                print(f"❌ 用户名 {username} 已存在")
-                return jsonify({'success': False, 'message': '用户名已存在'}), 400
+                print(f"❌ Username {username} already exists")
+                return jsonify({'success': False, 'message': 'Username already exists'}), 400
                 
-            # 检查邮箱是否已存在
+            # Check if email already exists
             existing_email = s.query(User).filter_by(email=email).first()
             if existing_email:
-                print(f"❌ 邮箱 {email} 已被注册")
-                return jsonify({'success': False, 'message': '该邮箱已被注册'}), 400
+                print(f"❌ Email {email} already registered")
+                return jsonify({'success': False, 'message': 'This email is already registered'}), 400
                 
-            # 获取对应的角色ID
+            # Get corresponding role ID
             role = s.query(Role).filter_by(name=role_name).first()
             if not role:
-                print(f"❌ 角色 {role_name} 不存在，将使用默认角色")
-                # 如果角色不存在，尝试创建
+                print(f"❌ Role {role_name} does not exist, default role will be used")
+                # If role does not exist, try to create
                 try:
                     if role_name == 'individual':
-                        role = Role(name='individual', description='个人纳税人')
+                        role = Role(name='individual', description='Individual taxpayer')
                     elif role_name == 'business':
-                        role = Role(name='business', description='企业用户')
+                        role = Role(name='business', description='Business user')
                     else:
-                        role = Role(name='individual', description='个人纳税人')
+                        role = Role(name='individual', description='Individual taxpayer')
                     s.add(role)
-                    s.flush()  # 获取新角色的ID
+                    s.flush()  # Get new role ID
                 except Exception as e:
-                    print(f"❌ 创建角色失败: {e}")
-                    # 回退到使用默认角色
+                    print(f"❌ Failed to create role: {e}")
+                    # Fallback to using default role
                     role = s.query(Role).filter_by(name='individual').first()
                     if not role:
-                        print("❌ 默认角色不存在，请先初始化角色")
-                        return jsonify({'success': False, 'message': '系统错误：角色未初始化'}), 500
+                        print("❌ Default role does not exist, please initialize role first")
+                        return jsonify({'success': False, 'message': 'System error: Role not initialized'}), 500
                 
-            # 创建新用户
+            # Create new user
             new_user = User(username=username, email=email, role_id=role.id)
             
-            # 设置其他用户字段
+            # Set other user fields
             if given_name:
                 new_user.given_name = given_name
             if family_name:
@@ -333,58 +333,58 @@ def register():
                 
             new_user.set_password(password)
             
-            # 直接设置为已验证，跳过邮箱验证
+            # Directly set as verified, skip email verification
             new_user.email_verified = True
             
-            # 添加到数据库
+            # Add to database
             s.add(new_user)
             s.commit()
             
-            print(f"✅ 用户 {username} 注册成功")
+            print(f"✅ User {username} registered successfully")
             return jsonify({
                 'success': True, 
-                'message': '注册成功，请直接登录',
+                'message': 'Registration successful, please log in directly',
             }), 201
                 
         except Exception as e:
             s.rollback()
-            print(f"❌ 注册失败 {username}: {e}")
+            print(f"❌ Registration failed {username}: {e}")
             import traceback
-            traceback.print_exc()  # 打印详细错误堆栈
-            return jsonify({'success': False, 'message': f'注册失败: {str(e)}'}), 500
+            traceback.print_exc()  # Print detailed error stack
+            return jsonify({'success': False, 'message': f'Registration failed: {str(e)}'}), 500
         finally:
             s.close()
     except Exception as e:
-        print(f"❌ 处理注册请求时出错: {e}")
+        print(f"❌ Error processing registration request: {e}")
         import traceback
-        traceback.print_exc()  # 打印详细错误堆栈
-        return jsonify({'success': False, 'message': f'服务器错误: {str(e)}'}), 500
+        traceback.print_exc()  # Print detailed error stack
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'}), 500
 
-# 邮箱验证接口
+# Email verification interface
 @app.route('/api/auth/verify-email/<token>', methods=['GET'])
 def verify_email(token):
-    """验证用户邮箱"""
-    print(f"⭐ 收到邮箱验证请求，令牌: {token}")
+    """Verify user email"""
+    print(f"⭐ Received email verification request, token: {token}")
     s = Session()
     try:
         user = s.query(User).filter_by(verification_token=token).first()
         if not user:
-            print("❌ 无效的验证令牌")
-            return jsonify({'success': False, 'message': '无效的验证链接'}), 400
+            print("❌ Invalid verification token")
+            return jsonify({'success': False, 'message': 'Invalid verification link'}), 400
             
-        # 更新验证状态
+        # Update verification status
         user.email_verified = True
-        user.verification_token = None  # 清除令牌，防止重复使用
+        user.verification_token = None  # Clear token to prevent reuse
         s.commit()
         
-        print(f"✅ 用户 {user.username} 的邮箱已验证")
+        print(f"✅ User {user.username}'s email has been verified")
         
-        # 返回HTML页面而不是JSON，用户体验更好
+        # Return HTML page instead of JSON for better user experience
         html = """
         <!DOCTYPE html>
         <html>
         <head>
-            <title>邮箱验证成功</title>
+            <title>Email Verification Successful</title>
             <style>
                 body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
                 .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -395,9 +395,9 @@ def verify_email(token):
         </head>
         <body>
             <div class="container">
-                <h1 class="success">邮箱验证成功！</h1>
-                <p>您的账户已激活，现在可以登录并使用所有功能。</p>
-                <a href="/" class="btn">返回登录</a>
+                <h1 class="success">Email Verification Successful!</h1>
+                <p>Your account has been activated. You can now log in and use all features.</p>
+                <a href="/" class="btn">Return to Login</a>
             </div>
         </body>
         </html>
@@ -405,62 +405,62 @@ def verify_email(token):
         return html
     except Exception as e:
         s.rollback()
-        print(f"❌ 验证邮箱失败: {e}")
+        print(f"❌ Email verification failed: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'success': False, 'message': f'验证邮箱失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': f'Email verification failed: {str(e)}'}), 500
     finally:
         s.close()
         
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """用户登录"""
-    print("⭐ 收到登录请求")
+    """User login"""
+    print("⭐ Received login request")
     
     try:
         data = request.json
         if not data:
-            return jsonify({'success': False, 'message': '无效的请求数据'}), 400
+            return jsonify({'success': False, 'message': 'Invalid request data'}), 400
             
         email = data.get('email')
         password = data.get('password')
         
         if not email or not password:
-            print("❌ 邮箱或密码为空")
-            return jsonify({'success': False, 'message': '请提供邮箱和密码'}), 400
+            print("❌ Email or password is empty")
+            return jsonify({'success': False, 'message': 'Please provide email and password'}), 400
             
         s = Session()
         try:
-            # 查找用户
+            # Find user
             user = s.query(User).filter_by(email=email).first()
             
             if not user:
-                print(f"❌ 邮箱 {email} 不存在")
-                return jsonify({'success': False, 'message': '邮箱或密码错误'}), 401
+                print(f"❌ Email {email} does not exist")
+                return jsonify({'success': False, 'message': 'Email or password error'}), 401
                 
             if not user.verify_password(password):
-                print(f"❌ 用户 {email} 密码错误")
-                return jsonify({'success': False, 'message': '邮箱或密码错误'}), 401
+                print(f"❌ User {email} password error")
+                return jsonify({'success': False, 'message': 'Email or password error'}), 401
                 
-            # 将用户标记为已验证
+            # Mark user as verified
             user.email_verified = True
             s.commit()
             
-            # 设置会话
+            # Set session
             session['user_id'] = user.id
             session['username'] = user.username
             session['role'] = user.role.name if user.role else None
-            session['last_activity'] = datetime.utcnow().isoformat()  # 存储为ISO格式字符串
+            session['last_activity'] = datetime.utcnow().isoformat()  # Store as ISO format string
             session.permanent = True
             
-            # 记录登录活动
+            # Record login activity
             record_user_activity(s, user.id, 'login', f'User login - Email: {email}', request.remote_addr)
             
-            # 登录成功，返回用户信息
-            print(f"✅ 用户 {email} 登录成功")
+            # Login successful, return user information
+            print(f"✅ User {email} login successful")
             return jsonify({
                 'success': True,
-                'message': '登录成功',
+                'message': 'Login successful',
                 'user': {
                     'id': user.id,
                     'username': user.username,
@@ -470,25 +470,25 @@ def login():
             }), 200
         except Exception as e:
             s.rollback()
-            print(f"❌ 登录处理失败: {str(e)}")
+            print(f"❌ Login processing failed: {str(e)}")
             import traceback
             traceback.print_exc()
-            return jsonify({'success': False, 'message': f'登录失败: {str(e)}'}), 500
+            return jsonify({'success': False, 'message': f'Login failed: {str(e)}'}), 500
         finally:
             s.close()
     except Exception as e:
-        print(f"❌ 处理登录请求时出错: {str(e)}")
+        print(f"❌ Error processing login request: {str(e)}")
         import traceback
         traceback.print_exc()
-        return jsonify({'success': False, 'message': f'服务器错误: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'}), 500
 
-# 登出接口
+# Logout interface
 @app.route('/api/auth/logout', methods=['POST'])
 def logout():
-    """用户登出"""
-    print("⭐ 收到登出请求")
+    """User logout"""
+    print("⭐ Received logout request")
     
-    # 记录登出活动
+    # Record logout activity
     if 'user_id' in session:
         user_id = session.get('user_id')
         email = session.get('username')
@@ -497,24 +497,24 @@ def logout():
             record_user_activity(s, user_id, 'logout', f'User logout - Email: {email}', request.remote_addr)
             s.commit()
         except Exception as e:
-            print(f"❌ 记录登出活动失败: {e}")
+            print(f"❌ Record logout activity failed: {e}")
         finally:
             s.close()
         
-    # 清除会话
+    # Clear session
     session.clear()
     
-    return jsonify({'success': True, 'message': '已成功登出'}), 200
+    return jsonify({'success': True, 'message': 'Logout successful'}), 200
 
-# 重新发送验证邮件的接口
+# Re-send verification email interface
 @app.route('/api/auth/resend-verification', methods=['POST'])
 def resend_verification():
-    """重新发送验证邮件"""
-    print("⭐ 收到重新发送验证邮件请求")
+    """Re-send verification email"""
+    print("⭐ Received re-send verification email request")
     try:
         data = request.json
         if not data or 'email' not in data:
-            return jsonify({'success': False, 'message': '请提供邮箱地址'}), 400
+            return jsonify({'success': False, 'message': 'Please provide email address'}), 400
             
         email = data.get('email')
         
@@ -523,42 +523,42 @@ def resend_verification():
             user = s.query(User).filter_by(email=email).first()
             
             if not user:
-                # 为了安全，不透露邮箱是否存在
-                return jsonify({'success': True, 'message': '如果该邮箱已注册，验证邮件将发送到该地址'}), 200
+                # For security, do not reveal email existence
+                return jsonify({'success': True, 'message': 'If this email is registered, verification email will be sent to this address'}), 200
                 
             if user.email_verified:
-                return jsonify({'success': False, 'message': '该邮箱已验证，无需重新验证'}), 400
+                return jsonify({'success': False, 'message': 'This email is verified, no need to re-verify'}), 400
                 
-            # 生成新的验证令牌
+            # Generate new verification token
             token = user.generate_verification_token()
             s.commit()
             
-            # 发送验证邮件
+            # Send verification email
             email_sent = send_verification_email(email, token)
             
             if email_sent:
-                return jsonify({'success': True, 'message': '验证邮件已重新发送，请查收'}), 200
+                return jsonify({'success': True, 'message': 'Verification email has been re-sent, please check'}), 200
             else:
-                return jsonify({'success': False, 'message': '发送验证邮件失败，请稍后再试'}), 500
+                return jsonify({'success': False, 'message': 'Failed to send verification email, please try again later'}), 500
                 
         except Exception as e:
             s.rollback()
-            print(f"❌ 重发验证邮件失败: {e}")
+            print(f"❌ Failed to re-send verification email: {e}")
             import traceback
             traceback.print_exc()
-            return jsonify({'success': False, 'message': f'重发验证邮件失败: {str(e)}'}), 500
+            return jsonify({'success': False, 'message': f'Failed to re-send verification email: {str(e)}'}), 500
         finally:
             s.close()
     except Exception as e:
-        print(f"❌ 处理重发验证邮件请求时出错: {e}")
+        print(f"❌ Error processing re-send verification email request: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'success': False, 'message': f'服务器错误: {str(e)}'}), 500
-
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'}), 500
+        
 @app.route('/api/auth/verify', methods=['GET'])
 def verify_user():
-    """验证用户是否已登录（用于前端鉴权）"""
-    # 如果使用会话，先检查会话中的用户信息
+    """Verify user is logged in (for frontend authorization)"""
+    # If using session, first check user information in session
     if 'user_id' in session:
         s = Session()
         try:
@@ -574,30 +574,30 @@ def verify_user():
                     }
                 }), 200
         except Exception as e:
-            print(f"❌ 会话验证失败: {e}")
+            print(f"❌ Session verification failed: {e}")
         finally:
             s.close()
     
-    # 回退到令牌验证（兼容旧版API）
+    # Fallback to token verification (compatible with old API)
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
-        return jsonify({'success': False, 'message': '未授权访问'}), 401
+        return jsonify({'success': False, 'message': 'Unauthorized access'}), 401
         
-    token = auth_header[7:]  # 去掉'Bearer '前缀
+    token = auth_header[7:]  # Remove 'Bearer ' prefix
     
     s = Session()
     try:
-        user = s.query(User).filter_by(username=token).first()  # 简化示例，实际应使用JWT
+        user = s.query(User).filter_by(username=token).first()  # Simplified example, actual should use JWT
         if not user or not user.is_active:
-            return jsonify({'success': False, 'message': '未授权访问'}), 401
+            return jsonify({'success': False, 'message': 'Unauthorized access'}), 401
             
-        # 更新会话（即使通过令牌验证，也为用户建立会话）
+        # Update session (even if verified through token, also establish session for user)
         session['user_id'] = user.id
         session['username'] = user.username
         session['role'] = user.role.name if user.role else None
-        session['last_activity'] = datetime.utcnow().isoformat()  # 存储为ISO格式字符串
+        session['last_activity'] = datetime.utcnow().isoformat()  # Store as ISO format string
         session.permanent = True
-        
+            
         return jsonify({
             'success': True,
             'user': {
@@ -608,23 +608,23 @@ def verify_user():
             }
         }), 200
     except Exception as e:
-        print(f"❌ 验证失败: {e}")
-        return jsonify({'success': False, 'message': f'验证失败: {str(e)}'}), 500
+        print(f"❌ Verification failed: {e}")
+        return jsonify({'success': False, 'message': f'Verification failed: {str(e)}'}), 500
     finally:
         s.close()
 
-# 审计日志查询（仅限管理员）
+# Audit log query (only for admin)
 @app.route('/api/admin/audit-logs', methods=['GET'])
 @requires_permission('admin')
 def get_audit_logs(current_user):
-    """获取审计日志记录（需要管理员权限）"""
-    print("⭐ 收到审计日志查询请求")
+    """Get audit log records (requires admin permission)"""
+    print("⭐ Received audit log query request")
     
-    # 分页参数
+    # Pagination parameters
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     
-    # 过滤参数
+    # Filter parameters
     user_id = request.args.get('user_id', type=int)
     action = request.args.get('action')
     from_date = request.args.get('from_date')
@@ -633,12 +633,12 @@ def get_audit_logs(current_user):
     
     s = Session()
     try:
-        # 预加载User和Role关系以避免懒加载错误
+        # Preload User and Role relationships to avoid lazy loading errors
         query = s.query(AuditLog).options(
             sqlalchemy.orm.joinedload(AuditLog.user).joinedload(User.role)
         )
         
-        # 应用过滤条件
+        # Apply filter conditions
         if user_id:
             query = query.filter(AuditLog.user_id == user_id)
         if action:
@@ -652,23 +652,23 @@ def get_audit_logs(current_user):
         if to_date:
             try:
                 to_datetime = datetime.strptime(to_date, '%Y-%m-%d')
-                to_datetime = to_datetime + timedelta(days=1)  # 包含当天
+                to_datetime = to_datetime + timedelta(days=1)  # Include current day
                 query = query.filter(AuditLog.timestamp < to_datetime)
             except ValueError:
                 pass
-        # 按用户角色筛选
+        # Filter by user role
         if user_role:
             query = query.join(AuditLog.user).join(User.role).filter(Role.name == user_role)
                 
-        # 避免使用user_role列进行计数查询
+        # Avoid using user_role column for counting query
         total = s.query(sqlalchemy.func.count(AuditLog.id)).scalar()
         
-        # 排序和分页
+        # Sort and paginate
         logs = query.order_by(AuditLog.timestamp.desc()).offset((page-1)*per_page).limit(per_page).all()
         
         result = []
         for log in logs:
-            # 安全处理用户角色,避免空引用错误
+            # Safe handling of user role, avoid null reference errors
             username = 'Unknown'
             user_role = 'Unknown'
             
@@ -688,7 +688,7 @@ def get_audit_logs(current_user):
                 'details': log.details
             })
         
-        # 记录审计日志
+        # Record audit log
         record_user_activity(s, current_user.id, 'view_audit_logs', f'Viewed audit logs', request.remote_addr)
         
         return jsonify({
@@ -700,21 +700,21 @@ def get_audit_logs(current_user):
             'total_pages': (total + per_page - 1) // per_page
         }), 200
     except Exception as e:
-        print(f"❌ 获取审计日志失败: {e}")
+        print(f"❌ Failed to get audit logs: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'success': False, 'message': f'获取审计日志失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': f'Failed to get audit logs: {str(e)}'}), 500
     finally:
         s.close()
 
-# 导出审计日志为PDF
+# Export audit logs as PDF
 @app.route('/api/admin/export-audit-logs/pdf', methods=['GET'])
 @requires_permission('admin')
 def export_audit_logs_pdf(current_user):
-    """导出审计日志为PDF（需要管理员权限）"""
-    print("⭐ 收到导出审计日志为PDF请求")
+    """Export audit logs as PDF (requires admin permission)"""
+    print("⭐ Received export audit logs as PDF request")
     
-    # 过滤参数
+    # Filter parameters
     user_id = request.args.get('user_id', type=int)
     action = request.args.get('action')
     from_date = request.args.get('from_date')
@@ -723,12 +723,12 @@ def export_audit_logs_pdf(current_user):
     
     s = Session()
     try:
-        # 使用与get_audit_logs相同的查询逻辑
+        # Use the same query logic as get_audit_logs
         query = s.query(AuditLog).options(
             sqlalchemy.orm.joinedload(AuditLog.user).joinedload(User.role)
         )
         
-        # 应用过滤条件
+        # Apply filter conditions
         if user_id:
             query = query.filter(AuditLog.user_id == user_id)
         if action:
@@ -742,23 +742,23 @@ def export_audit_logs_pdf(current_user):
         if to_date:
             try:
                 to_datetime = datetime.strptime(to_date, '%Y-%m-%d')
-                to_datetime = to_datetime + timedelta(days=1)  # 包含当天
+                to_datetime = to_datetime + timedelta(days=1)  # Include current day
                 query = query.filter(AuditLog.timestamp < to_datetime)
             except ValueError:
                 pass
-        # 按用户角色筛选
+        # Filter by user role
         if user_role:
             query = query.join(AuditLog.user).join(User.role).filter(Role.name == user_role)
                 
-        # 获取所有符合条件的日志，但最多不超过1000条
+        # Get all logs that match the conditions, but no more than 1000
         logs = query.order_by(AuditLog.timestamp.desc()).limit(1000).all()
         
-        # 记录审计日志
+        # Record audit log
         record_user_activity(s, current_user.id, 'export_audit_logs', f'Exported audit logs to PDF', request.remote_addr)
         
         result = []
         for log in logs:
-            # 安全处理用户角色
+            # Safe handling of user role
             username = 'Unknown'
             user_role_value = 'Unknown'
             
@@ -778,28 +778,28 @@ def export_audit_logs_pdf(current_user):
                 'details': log.details
             })
         
-        # 这里我们直接返回JSON，前端负责生成PDF
-        # 在实际生产环境中，可以在后端生成PDF并返回文件流
+        # Here we directly return JSON, front end is responsible for generating PDF
+        # In actual production environment, PDF can be generated on backend and returned as file stream
         return jsonify({
             'success': True,
             'logs': result
         }), 200
     except Exception as e:
-        print(f"❌ 导出审计日志为PDF失败: {e}")
+        print(f"❌ Failed to export audit logs as PDF: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'success': False, 'message': f'导出审计日志为PDF失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': f'Failed to export audit logs as PDF: {str(e)}'}), 500
     finally:
         s.close()
 
-# 导出审计日志为CSV
+# Export audit logs as CSV
 @app.route('/api/admin/export-audit-logs/csv', methods=['GET'])
 @requires_permission('admin')
 def export_audit_logs_csv(current_user):
-    """导出审计日志为CSV（需要管理员权限）"""
-    print("⭐ 收到导出审计日志为CSV请求")
+    """Export audit logs as CSV (requires admin permission)"""
+    print("⭐ Received export audit logs as CSV request")
     
-    # 过滤参数
+    # Filter parameters
     user_id = request.args.get('user_id', type=int)
     action = request.args.get('action')
     from_date = request.args.get('from_date')
@@ -808,12 +808,12 @@ def export_audit_logs_csv(current_user):
     
     s = Session()
     try:
-        # 使用与get_audit_logs相同的查询逻辑
+        # Use the same query logic as get_audit_logs
         query = s.query(AuditLog).options(
             sqlalchemy.orm.joinedload(AuditLog.user).joinedload(User.role)
         )
         
-        # 应用过滤条件
+        # Apply filter conditions
         if user_id:
             query = query.filter(AuditLog.user_id == user_id)
         if action:
@@ -827,23 +827,23 @@ def export_audit_logs_csv(current_user):
         if to_date:
             try:
                 to_datetime = datetime.strptime(to_date, '%Y-%m-%d')
-                to_datetime = to_datetime + timedelta(days=1)  # 包含当天
+                to_datetime = to_datetime + timedelta(days=1)  # Include current day
                 query = query.filter(AuditLog.timestamp < to_datetime)
             except ValueError:
                 pass
-        # 按用户角色筛选
+        # Filter by user role
         if user_role:
             query = query.join(AuditLog.user).join(User.role).filter(Role.name == user_role)
                 
-        # 获取所有符合条件的日志，但最多不超过5000条
+        # Get all logs that match the conditions, but no more than 5000
         logs = query.order_by(AuditLog.timestamp.desc()).limit(5000).all()
         
-        # 记录审计日志
+        # Record audit log
         record_user_activity(s, current_user.id, 'export_audit_logs', f'Exported audit logs to CSV', request.remote_addr)
         
         result = []
         for log in logs:
-            # 安全处理用户角色
+            # Safe handling of user role
             username = 'Unknown'
             user_role_value = 'Unknown'
             
@@ -863,25 +863,25 @@ def export_audit_logs_csv(current_user):
                 'details': log.details or ''
             })
         
-        # 这里我们直接返回JSON，前端负责生成CSV
-        # 在实际生产环境中，可以在后端生成CSV并返回文件流
+        # Here we directly return JSON, front end is responsible for generating CSV
+        # In actual production environment, CSV can be generated on backend and returned as file stream
         return jsonify({
             'success': True,
             'logs': result
         }), 200
     except Exception as e:
-        print(f"❌ 导出审计日志为CSV失败: {e}")
+        print(f"❌ Failed to export audit logs as CSV: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'success': False, 'message': f'导出审计日志为CSV失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': f'Failed to export audit logs as CSV: {str(e)}'}), 500
     finally:
         s.close()
 
-# ===== 记账 API =====
+# ===== Accounting API =====
 @app.route('/api/add_record', methods=['POST'])
 @requires_permission('add_record')
 def add_record(current_user):
-    """添加记账记录"""
+    """Add accounting record"""
     data = request.json
     s = Session()
     try:
@@ -894,10 +894,10 @@ def add_record(current_user):
         s.add(record)
         s.commit()
         
-        # 记录操作到审计日志
+        # Record operation to audit log
         record_user_activity(s, current_user.id, 'add_record', f"Added record ID: {record.id}", request.remote_addr)
         
-        return jsonify({'message': '记录添加成功', 'record_id': record.id}), 200
+        return jsonify({'message': 'Record added successfully', 'record_id': record.id}), 200
     except Exception as e:
         s.rollback()
         return jsonify({'error': str(e)}), 400
@@ -907,7 +907,7 @@ def add_record(current_user):
 @app.route('/api/get_records', methods=['GET'])
 @requires_permission('view_records')
 def get_records(current_user):
-    """获取所有记账记录"""
+    """Get all accounting records"""
     s = Session()
     try:
         from sqlalchemy.orm import joinedload
@@ -921,7 +921,7 @@ def get_records(current_user):
             'remarks': r.remarks
         } for r in records]
         
-        # 记录审计日志
+        # Record audit log
         record_user_activity(s, current_user.id, 'view_records', "Viewed all accounting records", request.remote_addr)
         
         return jsonify(result), 200
@@ -933,27 +933,27 @@ def get_records(current_user):
 @app.route('/api/delete_record/<int:record_id>', methods=['DELETE'])
 @requires_permission('delete_record')
 def delete_record(current_user, record_id):
-    """删除一条记账记录"""
+    """Delete an accounting record"""
     s = Session()
     try:
-        print(f"🔍 尝试删除记录 ID: {record_id}")  # ✅ 添加调试信息
+        print(f"🔍 Trying to delete record ID: {record_id}")  # ✅ Added debug information
 
         record = s.query(Record).filter_by(id=record_id).first()
         if not record:
-            print(f"❌ 记录 {record_id} 不存在！")  # ✅ 添加调试信息
-            return jsonify({'error': '记录不存在'}), 404
+            print(f"❌ Record {record_id} does not exist!")  # ✅ Added debug information
+            return jsonify({'error': 'Record does not exist'}), 404
         
         s.delete(record)
         s.commit()
         
-        # 记录审计日志
+        # Record audit log
         record_user_activity(s, current_user.id, 'delete_record', f"Deleted record ID: {record_id}", request.remote_addr)
         
-        print(f"✅ 记录 {record_id} 删除成功！")  # ✅ 添加调试信息
-        return jsonify({'message': '记录删除成功'}), 200
+        print(f"✅ Record {record_id} deleted successfully!")  # ✅ Added debug information
+        return jsonify({'message': 'Record deleted successfully'}), 200
     except Exception as e:
         s.rollback()
-        print(f"❌ 删除失败: {e}")  # ✅ 添加调试信息
+        print(f"❌ Delete failed: {e}")  # ✅ Added debug information
         return jsonify({'error': str(e)}), 400
     finally:
         s.close()
@@ -964,77 +964,77 @@ def update_record(current_user, record_id):
     data = request.json
     s = Session()
     try:
-        print(f"🔍 接收到更新请求，记录ID: {record_id}, 数据: {data}")
+        print(f"🔍 Received update request, recordID: {record_id}, data: {data}")
         
         record = s.query(Record).filter_by(id=record_id).first()
         if not record:
-            print(f"❌ 记录 {record_id} 不存在！")
-            return jsonify({'error': '记录不存在'}), 404
+            print(f"❌ Record {record_id} does not exist!")
+            return jsonify({'error': 'Record does not exist'}), 404
             
-        # 处理日期
+        # Handle date
         if 'date' in data:
             try:
                 record.date = datetime.strptime(data.get('date'), '%Y-%m-%d')
-                print(f"✅ 日期更新为: {record.date}")
+                print(f"✅ Date updated to: {record.date}")
             except ValueError as e:
-                print(f"❌ 日期格式错误: {e}")
-                return jsonify({'error': f'日期格式错误: {e}'}), 400
+                print(f"❌ Date format error: {e}")
+                return jsonify({'error': f'Date format error: {e}'}), 400
             
-        # 处理金额
+        # Handle amount
         if 'amount' in data:
             try:
                 record.amount = float(data.get('amount'))
-                print(f"✅ 金额更新为: {record.amount}")
+                print(f"✅ Amount updated to: {record.amount}")
             except ValueError as e:
-                print(f"❌ 金额格式错误: {e}")
-                return jsonify({'error': f'金额格式错误: {e}'}), 400
+                print(f"❌ Amount format error: {e}")
+                return jsonify({'error': f'Amount format error: {e}'}), 400
             
-        # 处理类别ID
+        # Handle category ID
         if 'category_id' in data and data['category_id'] is not None:
             record.category_id = data.get('category_id')
-            print(f"✅ 类别ID更新为: {record.category_id}")
-        # 如果前端传递了类别名称，通过名称查找对应的ID
+            print(f"✅ Category ID updated to: {record.category_id}")
+        # If frontend passes category name, find corresponding ID by name
         elif 'category' in data and data['category']:
             try:
                 category = s.query(Category).filter_by(name=data['category']).first()
                 if category:
                     record.category_id = category.id
-                    print(f"✅ 通过名称 '{data['category']}' 找到类别ID: {category.id}")
+                    print(f"✅ Found category ID by name '{data['category']}': {category.id}")
                 else:
-                    # 如果类别不存在，则创建新类别
+                    # If category does not exist, create new category
                     new_category = Category(name=data['category'])
                     s.add(new_category)
-                    s.flush()  # 获取新类别的ID
+                    s.flush()  # Get new category ID
                     record.category_id = new_category.id
-                    print(f"✅ 创建新类别 '{data['category']}', ID: {new_category.id}")
+                    print(f"✅ Created new category '{data['category']}', ID: {new_category.id}")
             except Exception as e:
-                print(f"❌ 处理类别时出错: {e}")
-                return jsonify({'error': f'处理类别时出错: {e}'}), 400
+                print(f"❌ Error processing category: {e}")
+                return jsonify({'error': f'Error processing category: {e}'}), 400
                 
-        # 处理备注
+        # Handle remarks
         if 'remarks' in data:
             record.remarks = data.get('remarks')
-            print(f"✅ 备注更新为: {record.remarks}")
+            print(f"✅ Remarks updated to: {record.remarks}")
             
         s.commit()
         
-        # 记录审计日志
+        # Record audit log
         record_user_activity(s, current_user.id, 'update_record', f"Updated record ID: {record_id}", request.remote_addr)
         
-        print(f"✅ 记录 {record_id} 更新成功!")
-        return jsonify({'message': '记录更新成功', 'record_id': record_id}), 200
+        print(f"✅ Record {record_id} updated successfully!")
+        return jsonify({'message': 'Record updated successfully', 'record_id': record_id}), 200
     except Exception as e:
         s.rollback()
-        print(f"❌ 更新失败: {e}")
+        print(f"❌ Update failed: {e}")
         import traceback
-        traceback.print_exc()  # 打印详细错误堆栈
+        traceback.print_exc()  # Print detailed error stack
         return jsonify({'error': str(e)}), 400
     finally:
         s.close()
 
 @app.route('/api/get_categories', methods=['GET'])
 def get_categories():
-    """获取所有类别"""
+    """Get all categories"""
     s = Session()
     try:
         categories = s.query(Category).all()
@@ -1045,11 +1045,11 @@ def get_categories():
     finally:
         s.close()
 
-# 用户管理API（仅限管理员）
+# User management API (only for admin)
 @app.route('/api/admin/users', methods=['GET'])
 @requires_permission('admin')
 def get_users(current_user):
-    """获取所有用户（需要管理员权限）"""
+    """Get all users (requires admin permission)"""
     s = Session()
     try:
         users = s.query(User).all()
@@ -1062,35 +1062,35 @@ def get_users(current_user):
             'role': user.role.name if user.role else None
         } for user in users]
         
-        # 记录审计日志
+        # Record audit log
         record_user_activity(s, current_user.id, 'view_users', "Viewed all users list", request.remote_addr)
         
         return jsonify({'success': True, 'users': result}), 200
     except Exception as e:
-        print(f"❌ 获取用户列表失败: {e}")
-        return jsonify({'success': False, 'message': f'获取用户失败: {str(e)}'}), 500
+        print(f"❌ Failed to get users list: {e}")
+        return jsonify({'success': False, 'message': f'Failed to get users: {str(e)}'}), 500
     finally:
         s.close()
 
 @app.route('/api/admin/user/<int:user_id>', methods=['PUT'])
 @requires_permission('admin')
 def update_user(current_user, user_id):
-    """更新用户信息（需要管理员权限）"""
+    """Update user information (requires admin permission)"""
     data = request.json
     s = Session()
     try:
         user = s.query(User).get(user_id)
         if not user:
-            return jsonify({'success': False, 'message': '用户不存在'}), 404
+            return jsonify({'success': False, 'message': 'User does not exist'}), 404
             
-        # 记录修改前的状态
+        # Record state before modification
         old_status = {
             'is_active': user.is_active,
             'role': user.role.name if user.role else None,
             'email_verified': user.email_verified
         }
         
-        # 更新用户状态
+        # Update user status
         if 'is_active' in data:
             user.is_active = data['is_active']
             
@@ -1104,7 +1104,7 @@ def update_user(current_user, user_id):
         
         s.commit()
         
-        # 记录审计日志
+        # Record audit log
         changes = {k: v for k, v in {
             'is_active': user.is_active,
             'role': user.role.name if user.role else None,
@@ -1121,7 +1121,7 @@ def update_user(current_user, user_id):
         
         return jsonify({
             'success': True,
-            'message': '用户信息已更新',
+            'message': 'User information updated',
             'user': {
                 'id': user.id,
                 'username': user.username,
@@ -1133,64 +1133,64 @@ def update_user(current_user, user_id):
         }), 200
     except Exception as e:
         s.rollback()
-        print(f"❌ 更新用户失败: {e}")
-        return jsonify({'success': False, 'message': f'更新用户失败: {str(e)}'}), 500
+        print(f"❌ Failed to update user: {e}")
+        return jsonify({'success': False, 'message': f'Failed to update user: {str(e)}'}), 500
     finally:
         s.close()
 
-# ===== Vue 前端托管 =====
+# ===== Vue frontend hosting =====
 @app.route("/")
 def serve_vue():
-    """返回 Vue 前端的 index.html"""
+    """Return Vue frontend's index.html"""
     return send_from_directory(app.static_folder, "index.html")
 
 @app.route("/<path:path>")
 def serve_static(path):
-    """返回 Vue 其他静态文件（JS、CSS、图片等）"""
+    """Return Vue other static files (JS, CSS, images, etc.)"""
     return send_from_directory(app.static_folder, path)
 
-# ===== 端口占用检查 =====
+# ===== Port occupation check =====
 def is_port_in_use(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('127.0.0.1', port)) == 0
 
-# 添加保存草稿的API端点
+# Add API endpoint to save draft
 @app.route('/api/save_draft', methods=['POST'])
 def save_draft():
-    """保存表单草稿到数据库"""
-    print("⭐ 收到保存草稿请求")
+    """Save form draft to database"""
+    print("⭐ Received save draft request")
     
-    # 检查用户是否已登录
+    # Check if user is logged in
     if 'user_id' not in session:
-        return jsonify({'success': False, 'message': '请先登录'}), 401
+        return jsonify({'success': False, 'message': 'Please log in first'}), 401
     
     try:
-        # 获取请求数据
+        # Get request data
         data = request.json
         if not data:
-            return jsonify({'success': False, 'message': '无效的请求数据'}), 400
+            return jsonify({'success': False, 'message': 'Invalid request data'}), 400
             
-        # 获取当前用户
+        # Get current user
         s = Session()
         user_id = session.get('user_id')
         user = s.query(User).filter_by(id=user_id).first()
         
         if not user:
-            return jsonify({'success': False, 'message': '用户不存在'}), 404
+            return jsonify({'success': False, 'message': 'User does not exist'}), 404
             
-        # 检查是新建草稿还是更新现有草稿
+        # Check if it's a new draft or updating an existing draft
         form_id = data.get('form_id')
         
-        # 创建或更新草稿表单
+        # Create or update draft form
         from models import TaxForm
         
         if form_id and str(form_id).startswith("temp-") or not form_id:
-            # 新建草稿，保存临时ID用于跟踪
+            # New draft, save temporary ID for tracking
             temp_id = form_id if form_id else None
             
             new_form = TaxForm(
                 user_id=user_id,
-                temp_id=temp_id,  # 保存前端临时ID
+                temp_id=temp_id,  # Save frontend temporary ID
                 date=data.get('date'),
                 declaration_type=data.get('declaration_type'),
                 address=data.get('address'),
@@ -1202,23 +1202,23 @@ def save_draft():
             s.add(new_form)
             s.commit()
             
-            # 记录用户活动
+            # Record user activity
             record_user_activity(s, user_id, 'DRAFT_SAVE', f'Saved draft form - ID: {new_form.id}, Type: {data.get("declaration_type")}, Amount: {data.get("price")}', request.remote_addr)
             
-            # 返回生成的ID和临时ID
+            # Return generated ID and temporary ID
             return jsonify({
                 'success': True,
-                'message': '草稿保存成功',
+                'message': 'Draft saved successfully',
                 'id': new_form.id,
                 'temp_id': temp_id
             })
         else:
-            # 更新现有草稿
+            # Update existing draft
             existing_form = s.query(TaxForm).filter_by(id=form_id, user_id=user_id).first()
             if not existing_form:
-                return jsonify({'success': False, 'message': '表单不存在或无权限'}), 404
+                return jsonify({'success': False, 'message': 'Form does not exist or no permission'}), 404
                 
-            # 更新字段
+            # Update fields
             existing_form.date = data.get('date')
             existing_form.declaration_type = data.get('declaration_type')
             existing_form.address = data.get('address')
@@ -1229,61 +1229,61 @@ def save_draft():
             
             s.commit()
             
-            # 记录用户活动
+            # Record user activity
             record_user_activity(s, user_id, 'DRAFT_UPDATE', f'Updated draft form - ID: {existing_form.id}, Type: {data.get("declaration_type")}, Amount: {data.get("price")}', request.remote_addr)
             
             return jsonify({
                 'success': True,
-                'message': '草稿更新成功',
+                'message': 'Draft updated successfully',
                 'id': existing_form.id,
                 'temp_id': existing_form.temp_id
             })
             
     except Exception as e:
-        print(f"❌ 保存草稿失败: {e}")
+        print(f"❌ Failed to save draft: {e}")
         import traceback
         traceback.print_exc()
         s.rollback()
-        return jsonify({'success': False, 'message': f'保存草稿失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': f'Failed to save draft: {str(e)}'}), 500
     finally:
         s.close()
 
-# 添加提交税务表单的API端点
+# Add API endpoint to submit tax form
 @app.route('/api/submit_tax_form', methods=['POST'])
 def submit_tax_form():
-    """提交税务表单到数据库"""
-    print("⭐ 收到提交税务表单请求")
+    """Submit tax form to database"""
+    print("⭐ Received submit tax form request")
     
-    # 检查用户是否已登录
+    # Check if user is logged in
     if 'user_id' not in session:
-        return jsonify({'success': False, 'message': '请先登录'}), 401
+        return jsonify({'success': False, 'message': 'Please log in first'}), 401
     
     try:
-        # 获取请求数据
+        # Get request data
         data = request.json
         if not data:
-            return jsonify({'success': False, 'message': '无效的请求数据'}), 400
+            return jsonify({'success': False, 'message': 'Invalid request data'}), 400
             
-        # 获取当前用户
+        # Get current user
         s = Session()
         user_id = session.get('user_id')
         user = s.query(User).filter_by(id=user_id).first()
         
         if not user:
-            return jsonify({'success': False, 'message': '用户不存在'}), 404
+            return jsonify({'success': False, 'message': 'User does not exist'}), 404
             
-        # 检查是否从现有草稿提交
+        # Check if submitting from existing draft
         form_id = data.get('form_id')
         
         from models import TaxForm
         
         if form_id and not str(form_id).startswith("temp-"):
-            # 更新现有表单
+            # Update existing form
             existing_form = s.query(TaxForm).filter_by(id=form_id, user_id=user_id).first()
             if not existing_form:
-                return jsonify({'success': False, 'message': '表单不存在或无权限'}), 404
+                return jsonify({'success': False, 'message': 'Form does not exist or no permission'}), 404
                 
-            # 更新字段
+            # Update fields
             existing_form.date = data.get('date')
             existing_form.declaration_type = data.get('declaration_type')
             existing_form.address = data.get('address')
@@ -1296,22 +1296,22 @@ def submit_tax_form():
             
             s.commit()
             
-            # 记录用户活动
+            # Record user activity
             record_user_activity(s, user_id, 'FORM_SUBMIT', f'Submitted form - ID: {existing_form.id}, Type: {data.get("declaration_type")}, Amount: {data.get("price")}, Date: {data.get("date")}', request.remote_addr)
             
             return jsonify({
                 'success': True,
-                'message': '表单提交成功',
+                'message': 'Form submitted successfully',
                 'id': existing_form.id,
                 'temp_id': existing_form.temp_id
             })
         else:
-            # 创建新表单，保存临时ID
+            # Create new form, save temporary ID
             temp_id = form_id if form_id else None
             
             new_form = TaxForm(
                 user_id=user_id,
-                temp_id=temp_id,  # 保存前端临时ID
+                temp_id=temp_id,  # Save frontend temporary ID
                 date=data.get('date'),
                 declaration_type=data.get('declaration_type'),
                 address=data.get('address'),
@@ -1324,51 +1324,51 @@ def submit_tax_form():
             s.add(new_form)
             s.commit()
             
-            # 记录用户活动
+            # Record user activity
             record_user_activity(s, user_id, 'FORM_SUBMIT', f'Submitted new form - ID: {new_form.id}, Type: {data.get("declaration_type")}, Amount: {data.get("price")}, Date: {data.get("date")}', request.remote_addr)
             
-            # 返回生成的ID和临时ID
+            # Return generated ID and temporary ID
             return jsonify({
                 'success': True,
-                'message': '表单提交成功',
+                'message': 'Form submitted successfully',
                 'id': new_form.id,
                 'temp_id': temp_id
             })
             
     except Exception as e:
-        print(f"❌ 提交表单失败: {e}")
+        print(f"❌ Failed to submit form: {e}")
         import traceback
         traceback.print_exc()
         s.rollback()
-        return jsonify({'success': False, 'message': f'提交表单失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': f'Failed to submit form: {str(e)}'}), 500
     finally:
         s.close()
         
-# 查询所有税务表单
+# Query all tax forms
 @app.route('/api/get_tax_forms', methods=['GET'])
 def get_tax_forms():
-    """获取当前用户的所有税务表单"""
-    print("⭐ 收到获取税务表单请求")
+    """Get all tax forms for current user"""
+    print("⭐ Received get tax forms request")
     
-    # 检查用户是否已登录
+    # Check if user is logged in
     if 'user_id' not in session:
-        return jsonify({'success': False, 'message': '请先登录'}), 401
+        return jsonify({'success': False, 'message': 'Please log in first'}), 401
     
     try:
-        # 获取当前用户
+        # Get current user
         s = Session()
         user_id = session.get('user_id')
         
-        # 查询用户的所有表单
+        # Query user's all forms
         from models import TaxForm
         forms = s.query(TaxForm).filter_by(user_id=user_id).order_by(TaxForm.updated_at.desc()).all()
         
-        # 转换为JSON格式
+        # Convert to JSON format
         forms_data = []
         for form in forms:
             forms_data.append({
                 'id': form.id,
-                'temp_id': form.temp_id,  # 包含临时ID
+                'temp_id': form.temp_id,  # Include temporary ID
                 'date': form.date,
                 'declaration_type': form.declaration_type,
                 'address': form.address,
@@ -1381,7 +1381,7 @@ def get_tax_forms():
                 'submitted_at': form.submitted_at.isoformat() if form.submitted_at else None,
             })
         
-        # 记录用户查看表单历史的活动
+        # Record user viewed form history activity
         record_user_activity(s, user_id, 'VIEW_FORMS', f'Viewed form history - {len(forms_data)} records', request.remote_addr)
         
         return jsonify({
@@ -1390,16 +1390,16 @@ def get_tax_forms():
         })
             
     except Exception as e:
-        print(f"❌ 获取表单失败: {e}")
+        print(f"❌ Failed to get forms: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'success': False, 'message': f'获取表单失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': f'Failed to get forms: {str(e)}'}), 500
     finally:
         s.close()
 
 if __name__ == '__main__':
     if is_port_in_use(PORT):
-        print(f"⚠️  端口 {PORT} 已被占用，请先释放端口或使用其他端口！")
+        print(f"⚠️ Port {PORT} is occupied, please release port or use other port!")
         sys.exit(1)
 
     print(f"✅ Running Flask on port {PORT}, Debug mode: {DEBUG}")

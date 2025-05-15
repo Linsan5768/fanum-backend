@@ -5,28 +5,28 @@ import os
 import secrets  # For generating secure tokens
 import datetime
 
-# 连接 SQLite 数据库（使用 accounting.db）
+# Connect to SQLite database (using accounting.db)
 DATABASE_URL = "sqlite:///accounting.db"  
 # Increase the timeout to 30 seconds (default is often 5)
 engine = create_engine(DATABASE_URL, echo=True, connect_args={"timeout": 30})
 
-# ORM 基类
+# ORM base class
 Base = declarative_base()
 
 # SQLAlchemy Session
 Session = sessionmaker(bind=engine)
 
-# 分类表
+# Category table
 class Category(Base):
     __tablename__ = 'categories'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, unique=True, nullable=False)
     
-    # 反向关系：一个分类对应多个记账记录
+    # Reverse relationship: one category corresponds to multiple records
     records = relationship("Record", back_populates="category")
 
-# 记账记录表
+# Accounting records table
 class Record(Base):
     __tablename__ = 'records'
 
@@ -36,10 +36,10 @@ class Record(Base):
     category_id = Column(Integer, ForeignKey('categories.id'))
     remarks = Column(String)
 
-    # 关联分类表
+    # Associated with category table
     category = relationship("Category", back_populates="records")
 
-# 角色表
+# Role table
 class Role(Base):
     __tablename__ = 'roles'
     
@@ -47,10 +47,10 @@ class Role(Base):
     name = Column(String, unique=True, nullable=False)
     description = Column(String)
     
-    # 一个角色对应多个用户
+    # One role corresponds to multiple users
     users = relationship("User", back_populates="role")
 
-# 审计日志表
+# Audit log table
 class AuditLog(Base):
     __tablename__ = 'audit_logs'
     
@@ -59,34 +59,34 @@ class AuditLog(Base):
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
     action = Column(String, nullable=False)  # login, logout, record_create, etc.
     ip_address = Column(String)
-    details = Column(String)  # 其他详细信息
-    user_role = Column(String)  # 用户角色
+    details = Column(String)  # Other detailed information
+    user_role = Column(String)  # User role
     
     user = relationship("User")
 
-# 税务表单模型
+# Tax form model
 class TaxForm(Base):
     __tablename__ = 'tax_forms'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    temp_id = Column(String, nullable=True)  # 存储前端临时ID，用于跟踪
-    date = Column(String, nullable=False)  # 表单日期
-    declaration_type = Column(String, nullable=False)  # 申报类型
-    address = Column(String, nullable=False)  # 地址
-    declaration_name = Column(String, nullable=False)  # 申报名称
-    price = Column(Float, nullable=False, default=0)  # 金额
-    other_info = Column(String, nullable=True)  # 其他信息
-    status = Column(String, nullable=False, default='draft')  # 状态：draft, submitted, failed
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)  # 创建时间
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)  # 更新时间
-    submitted_at = Column(DateTime, nullable=True)  # 提交时间
+    temp_id = Column(String, nullable=True)  # Store frontend temporary ID for tracking
+    date = Column(String, nullable=False)  # Form date
+    declaration_type = Column(String, nullable=False)  # Declaration type
+    address = Column(String, nullable=False)  # Address
+    declaration_name = Column(String, nullable=False)  # Declaration name
+    price = Column(Float, nullable=False, default=0)  # Amount
+    other_info = Column(String, nullable=True)  # Other information
+    status = Column(String, nullable=False, default='draft')  # Status: draft, submitted, failed
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)  # Creation time
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)  # Update time
+    submitted_at = Column(DateTime, nullable=True)  # Submission time
     
-    # 关联用户
+    # User association
     user = relationship("User", backref="tax_forms")
     
     def to_dict(self):
-        """转换为字典格式便于JSON序列化"""
+        """Convert to dictionary format for JSON serialization"""
         return {
             'id': self.id,
             'temp_id': self.temp_id,
@@ -103,62 +103,62 @@ class TaxForm(Base):
             'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None
         }
 
-# 用户表
+# User table
 class User(Base):
     __tablename__ = 'users'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String, unique=True, nullable=False)
-    email = Column(String, unique=True, nullable=False)  # 新增邮箱字段
+    email = Column(String, unique=True, nullable=False)  # Email field
     password_hash = Column(String, nullable=False)
     salt = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
-    email_verified = Column(Boolean, default=False)  # 邮箱验证状态
-    verification_token = Column(String, nullable=True)  # 验证令牌
-    role_id = Column(Integer, ForeignKey('roles.id'))  # 用户角色
-    # 添加个人信息字段
+    email_verified = Column(Boolean, default=False)  # Email verification status
+    verification_token = Column(String, nullable=True)  # Verification token
+    role_id = Column(Integer, ForeignKey('roles.id'))  # User role
+    # Additional personal information fields
     given_name = Column(String, nullable=True)
     family_name = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     
-    # 关系
+    # Relationships
     role = relationship("Role", back_populates="users")
     audit_logs = relationship("AuditLog", backref="logged_user")
     
     def set_password(self, password):
-        """设置密码，使用随机盐值和SHA-256哈希"""
+        """Set password using random salt and SHA-256 hash"""
         self.salt = os.urandom(16).hex()
         self.password_hash = self._hash_password(password, self.salt)
     
     def verify_password(self, password):
-        """验证密码是否正确"""
+        """Verify if password is correct"""
         return self.password_hash == self._hash_password(password, self.salt)
     
     def generate_verification_token(self):
-        """生成邮箱验证令牌"""
+        """Generate email verification token"""
         self.verification_token = secrets.token_urlsafe(32)
         return self.verification_token
     
     def has_permission(self, permission):
-        """检查用户是否有指定权限"""
+        """Check if user has specified permission"""
         if not self.role:
             return False
             
-        # 管理员拥有所有权限
+        # Administrators have all permissions
         if self.role.name == 'admin':
             return True
             
-        # 确保用户邮箱已验证
+        # Ensure user email is verified
         if not self.email_verified:
             return False
             
-        # 根据角色和权限类型判断
+        # Judge based on role and permission type
         if self.role.name in ['individual', 'business']:
-            # 所有已验证用户都可以执行的操作
+            # Operations that all verified users can perform
             if permission in ['view_records', 'add_record', 'update_record', 'delete_record']:
                 return True
                 
-        # 企业用户特有权限
+        # Business user specific permissions
         if self.role.name == 'business' and permission in ['manage_employees', 'view_reports']:
             return True
             
@@ -166,50 +166,50 @@ class User(Base):
     
     @staticmethod
     def _hash_password(password, salt):
-        """使用盐值哈希密码"""
+        """Hash password with salt"""
         return hashlib.sha256((password + salt).encode()).hexdigest()
 
-# 插入默认分类
+# Insert default categories
 def insert_default_categories(session):
-    """初始化默认分类"""
-    default_categories = ['餐饮', '话费', '理发', '交通', '洗衣', '超市购物', '零钱', '房租']
+    """Initialize default categories"""
+    default_categories = ['Dining', 'Phone Bill', 'Haircut', 'Transportation', 'Laundry', 'Supermarket Shopping', 'Petty Cash', 'Rent']
     
     existing_categories = {c.name for c in session.query(Category).all()}
-    print("数据库已有类别:", existing_categories)  # 调试输出
+    print("Existing categories in database:", existing_categories)  # Debug output
 
     for name in default_categories:
         if name not in existing_categories:
-            print(f"插入类别: {name}")  # 调试输出
+            print(f"Inserting category: {name}")  # Debug output
             session.add(Category(name=name))
     
     session.commit()
 
 def init_roles(session):
-    """初始化角色"""
+    """Initialize roles"""
     roles = [
-        {'name': 'individual', 'description': '个人纳税人'},
-        {'name': 'business', 'description': '企业用户'},
-        {'name': 'admin', 'description': '系统管理员'}
+        {'name': 'individual', 'description': 'Individual Taxpayer'},
+        {'name': 'business', 'description': 'Business User'},
+        {'name': 'admin', 'description': 'System Administrator'}
     ]
     
     for role_data in roles:
         if not session.query(Role).filter_by(name=role_data['name']).first():
-            print(f"创建角色: {role_data['name']}")
+            print(f"Creating role: {role_data['name']}")
             session.add(Role(**role_data))
     
     session.commit()
 
 def record_user_activity(session, user_id, action, details=None, ip_address=None):
-    """记录用户活动到审计日志"""
+    """Record user activity to audit log"""
     try:
-        # 获取用户角色
+        # Get user role
         user_role = None
         try:
             user = session.query(User).filter_by(id=user_id).first()
             if user and user.role:
                 user_role = user.role.name
         except Exception as e:
-            print(f"获取用户角色失败: {e}")
+            print(f"Failed to get user role: {e}")
         
         log = AuditLog(
             user_id=user_id,
@@ -224,25 +224,25 @@ def record_user_activity(session, user_id, action, details=None, ip_address=None
         return True
     except Exception as e:
         session.rollback()
-        print(f"记录活动失败: {e}")
+        print(f"Failed to record activity: {e}")
         return False
 
-# 创建表
+# Create tables
 def init_db():
-    """初始化数据库"""
-    # 如果表已存在，先删除所有表
+    """Initialize database"""
+    # If tables already exist, delete all tables first
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     with Session() as session:
-        # 初始化角色
+        # Initialize roles
         init_roles(session)
-        # 初始化分类
+        # Initialize categories
         insert_default_categories(session)
-        # 创建默认管理员账户（如果不存在）
+        # Create default admin account (if not exists)
         admin_role = session.query(Role).filter_by(name='admin').first()
         if not admin_role:
-            print("创建管理员角色")
-            admin_role = Role(name='admin', description='系统管理员')
+            print("Creating admin role")
+            admin_role = Role(name='admin', description='System Administrator')
             session.add(admin_role)
             session.flush()
             
@@ -256,10 +256,10 @@ def init_db():
                 phone='+61400000000'
             )
             admin.set_password('Admin123$')
-            admin.email_verified = True  # 默认管理员账户邮箱已验证
+            admin.email_verified = True  # Default admin account email is verified
             session.add(admin)
             session.commit()
 
-# 运行数据库初始化
+# Run database initialization
 if __name__ == "__main__":
     init_db()
