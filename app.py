@@ -90,7 +90,7 @@ def handle_auth_preflight():
     response = jsonify({'status': 'ok'})
     response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
+
     return response
 
 # 发送邮件函数
